@@ -1,0 +1,43 @@
+services:
+  nodered:
+    container_name: nodered
+    image: nodered/node-red:latest
+    ports:
+     - "1880:1880"
+    volumes:
+      - node-red-data:/data
+    networks:
+      - iot_net
+      - edge_net
+
+  mosquitto:
+    container_name: mosquitto
+    image: eclipse-mosquitto:latest
+    volumes:
+      - ./mosquitto_conf/mosquitto.conf:/mosquitto/config/mosquitto.conf:rw
+      - ./mosquitto_conf/acl:/mosquitto/config/acl:rw
+      - ./mosquitto_conf/passwd:/mosquitto/config/passwd:rw
+    ports:
+     - "1883:1883"
+    networks:
+      - iot_net
+  sensor:
+    container_name: sensor
+    build: ./sensor
+    networks:
+      - iot_net
+
+  # suricata:
+  #   container_name: suricata
+  #   image: jasonish/suricata:main
+  #   volumes:
+  #     - 
+
+volumes:
+  node-red-data:
+
+networks:
+  iot_net:
+    external: True
+  edge_net:
+    external: True

@@ -1,0 +1,13 @@
+user student
+topic readwrite telemetry/#
+topic readwrite alerts/#
+
+user sensor
+topic write telemetry/#
+
+user edge
+topic read alerts/#
+
+user nodered
+topic readwrite telemetry/#
+topic readwrite alerts/#
