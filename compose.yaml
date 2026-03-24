@@ -27,6 +27,12 @@ services:
     networks:
       - iot_net
 
+  attacker:
+    container_name: attacker
+    build: ./attacker
+    networks:
+      - iot_net
+
   # suricata:
   #   container_name: suricata
   #   image: jasonish/suricata:main
