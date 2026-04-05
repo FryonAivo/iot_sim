@@ -44,6 +44,6 @@ volumes:
 
 networks:
   iot_net:
-    external: True
+    # external: True
   edge_net:
-    external: True
+    # external: True
