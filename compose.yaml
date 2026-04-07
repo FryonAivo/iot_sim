@@ -1,24 +1,25 @@
 services:
   nodered:
-    container_name: nodered
+    container_name: node-red
     image: nodered/node-red:latest
-    ports:
+    restart: unless-stopped
+    ports: 
      - "1880:1880"
     volumes:
-      - node-red-data:/data
+     - node-red-data:/data
     networks:
-      - iot_net
-      - edge_net
-
+     - iot_net
+     - edge_net
   mosquitto:
     container_name: mosquitto
     image: eclipse-mosquitto:latest
+    restart: unless-stopped
+    ports:
+     - "1883:1883"
     volumes:
       - ./mosquitto_conf/mosquitto.conf:/mosquitto/config/mosquitto.conf:rw
       - ./mosquitto_conf/acl:/mosquitto/config/acl:rw
       - ./mosquitto_conf/passwd:/mosquitto/config/passwd:rw
-    ports:
-     - "1883:1883"
     networks:
       - iot_net
   sensor:
@@ -26,24 +27,60 @@ services:
     build: ./sensor
     networks:
       - iot_net
-
-  attacker:
-    container_name: attacker
-    build: ./attacker
-    networks:
-      - iot_net
-
-  # suricata:
-  #   container_name: suricata
-  #   image: jasonish/suricata:main
-  #   volumes:
-  #     - 
-
+      
 volumes:
   node-red-data:
 
 networks:
-  iot_net:
-    # external: True
   edge_net:
-    # external: True
+  iot_net:
+
+# services:
+#   nodered:
+#     container_name: nodered
+#     image: nodered/node-red:latest
+#     ports:
+#      - "1880:1880"
+#     volumes:
+#       - node-red-data:/data
+#     networks:
+#       - iot_net
+#       - edge_net
+
+#   mosquitto:
+#     container_name: mosquitto
+#     image: eclipse-mosquitto:latest
+#     volumes:
+#       - ./mosquitto_conf/mosquitto.conf:/mosquitto/config/mosquitto.conf:rw
+#       - ./mosquitto_conf/acl:/mosquitto/config/acl:rw
+#       - ./mosquitto_conf/passwd:/mosquitto/config/passwd:rw
+#     ports:
+#      - "1883:1883"
+#     networks:
+#       - iot_net
+#   sensor:
+#     container_name: sensor
+#     build: ./sensor
+#     networks:
+#       - iot_net
+
+#   attacker:
+#     container_name: attacker
+#     build: ./attacker
+#     networks:
+#       - iot_net
+
+#   # suricata:
+#   #   container_name: suricata
+#   #   image: jasonish/suricata:main
+#   #   volumes:
+#   #     - 
+
+# volumes:
+#   node-red-data:
+
+# networks:
+#   iot_net:
+#     # external: True
+#   edge_net:
+#     # external: True

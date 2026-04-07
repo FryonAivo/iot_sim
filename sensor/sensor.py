@@ -1,24 +1,51 @@
 import paho.mqtt.client as mqtt
-import json
-import time
 import random
+import time
 
 BROKER = "mosquitto"
-TOPIC = "telemetry/sensor_01"
+PORT = 1883
+TOPIC = "telementry/sensor_01"
+USERNAME = "sensor"
+PASSWORD = "sensor"
 
-client = mqtt.Client()
-client.username_pw_set('sensor', 'sensor')
-client.connect(BROKER, 1883)
 
-while True:
-    # Simulating data
-    data = {
-        "device_id": "sensor_01",
-        "temperature": round(random.uniform(20.0, 35.0), 2),
-        "timestamp": int(time.time())
-    }
+def on_connect(client, userdata, flags, reason_code, properties):
+    if reason_code.is_failure:
+        print(f"Connection failed: {reason_code}")
+    else:
+        print(f"Connected to {BROKER}:{PORT}")
 
-    payload = json.dumps(data)
-    client.publish(TOPIC, payload)
-    print(f"Published: {payload}")
-    time.sleep(5)
+
+def on_disconnect(client, userdata, flags, reason_code, properties):
+    print(f"Disconnected: {reason_code}")
+
+
+def on_publish(client, userdata, mid, reason_code, properties):
+    if reason_code is not None and reason_code.is_failure:
+        print(f"Publish failed for mid {mid}: {reason_code}")
+    else:
+        print(f"Message {mid} published")
+
+# This is correct, I'm not sure why the linter doesn't like it
+client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2) # type: ignore
+client.username_pw_set(USERNAME, PASSWORD)
+client.on_connect = on_connect
+client.on_disconnect = on_disconnect
+client.on_publish = on_publish
+
+client.connect(BROKER, PORT, keepalive=60)
+client.loop_start()
+
+try:
+    while True:
+        temp = round(random.uniform(20.0, 35.0), 2)
+        payload = f'{{"temperature": {temp}}}'
+        info = client.publish(TOPIC, payload, qos=1)
+        if info.rc != mqtt.MQTT_ERR_SUCCESS:
+            print(f"Publish error: {mqtt.error_string(info.rc)}")
+        time.sleep(0.25)
+except KeyboardInterrupt:
+    print("Stopping publisher...")
+finally:
+    client.loop_stop()
+    client.disconnect()
