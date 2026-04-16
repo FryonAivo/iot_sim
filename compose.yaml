@@ -3,84 +3,87 @@ services:
     container_name: node-red
     image: nodered/node-red:latest
     restart: unless-stopped
-    ports: 
-     - "1880:1880"
+    ports:
+      - "1880:1880"
     volumes:
-     - node-red-data:/data
+      - node-red-data:/data
+      - ./nodered_conf/policy.json:/data/policy.json:ro
+      - ./nodered_conf/flows/flows.json:/data/flows.json:rw
     networks:
-     - iot_net
-     - edge_net
+      - iot_net
+      - edge_net
+
   mosquitto:
     container_name: mosquitto
     image: eclipse-mosquitto:latest
     restart: unless-stopped
     ports:
-     - "1883:1883"
+      - "1883:1883"
     volumes:
       - ./mosquitto_conf/mosquitto.conf:/mosquitto/config/mosquitto.conf:rw
       - ./mosquitto_conf/acl:/mosquitto/config/acl:rw
       - ./mosquitto_conf/passwd:/mosquitto/config/passwd:rw
     networks:
       - iot_net
+
   sensor:
     container_name: sensor
     build: ./sensor
     networks:
       - iot_net
-      
+
+  # Stage 3: Attacker — run with: docker compose run attacker <broker_ip> flood|brute-*
+  attacker:
+    container_name: attacker
+    build: ./attacker
+    networks:
+      - iot_net
+
+  # Stage 3: Suricata IDS — monitors docker0 in host network mode (Linux only)
+  suricata:
+    container_name: suricata
+    image: jasonish/suricata:latest
+    restart: unless-stopped
+    network_mode: host
+    cap_add:
+      - NET_ADMIN
+      - SYS_NICE
+    volumes:
+      - ./suricata/rules:/etc/suricata/rules
+      - ./suricata/logs:/var/log/suricata
+    command: -i docker0 -v
+
+  # Stage 5: Prometheus — scrapes metrics from Node-RED /metrics endpoint
+  prometheus:
+    container_name: prometheus
+    image: prom/prometheus:latest
+    restart: unless-stopped
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    networks:
+      - edge_net
+
+  # Stage 5: Grafana — visualises Prometheus metrics (login: admin / admin)
+  grafana:
+    container_name: grafana
+    image: grafana/grafana:latest
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+    networks:
+      - edge_net
+
 volumes:
   node-red-data:
+  grafana-data:
 
 networks:
   edge_net:
   iot_net:
-
-# services:
-#   nodered:
-#     container_name: nodered
-#     image: nodered/node-red:latest
-#     ports:
-#      - "1880:1880"
-#     volumes:
-#       - node-red-data:/data
-#     networks:
-#       - iot_net
-#       - edge_net
-
-#   mosquitto:
-#     container_name: mosquitto
-#     image: eclipse-mosquitto:latest
-#     volumes:
-#       - ./mosquitto_conf/mosquitto.conf:/mosquitto/config/mosquitto.conf:rw
-#       - ./mosquitto_conf/acl:/mosquitto/config/acl:rw
-#       - ./mosquitto_conf/passwd:/mosquitto/config/passwd:rw
-#     ports:
-#      - "1883:1883"
-#     networks:
-#       - iot_net
-#   sensor:
-#     container_name: sensor
-#     build: ./sensor
-#     networks:
-#       - iot_net
-
-#   attacker:
-#     container_name: attacker
-#     build: ./attacker
-#     networks:
-#       - iot_net
-
-#   # suricata:
-#   #   container_name: suricata
-#   #   image: jasonish/suricata:main
-#   #   volumes:
-#   #     - 
-
-# volumes:
-#   node-red-data:
-
-# networks:
-#   iot_net:
-#     # external: True
-#   edge_net:
-#     # external: True

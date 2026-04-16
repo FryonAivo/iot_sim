@@ -1,0 +1,10 @@
+{
+  "devices": {
+    "sensor_01": {
+      "allowed_topics": ["telemetry/sensor_01"],
+      "rate_limit_msg_per_sec": 2,
+      "enabled": true
+    }
+  },
+  "default_policy": "deny"
+}

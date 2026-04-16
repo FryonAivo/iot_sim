@@ -1,0 +1,8 @@
+global:
+  scrape_interval: 15s
+
+scrape_configs:
+  - job_name: 'nodered-edge'
+    static_configs:
+      - targets: ['nodered:1880']
+    metrics_path: '/metrics'

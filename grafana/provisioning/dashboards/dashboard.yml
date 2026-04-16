@@ -1,0 +1,8 @@
+apiVersion: 1
+
+providers:
+  - name: edge-security
+    folder: Edge Security
+    type: file
+    options:
+      path: /etc/grafana/provisioning/dashboards

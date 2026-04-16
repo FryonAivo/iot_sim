@@ -1,0 +1,218 @@
+[
+    {
+        "id": "f6f2187d.f17ca8",
+        "type": "tab",
+        "label": "Flow 1",
+        "disabled": false,
+        "info": ""
+    },
+    {
+        "id": "b5c08fca49d271fb",
+        "type": "mqtt-broker",
+        "name": "",
+        "broker": "mosquitto",
+        "port": 1883,
+        "clientid": "",
+        "autoConnect": true,
+        "usetls": false,
+        "protocolVersion": 4,
+        "keepalive": 60,
+        "cleansession": true,
+        "autoUnsubscribe": true,
+        "birthTopic": "",
+        "birthQos": "0",
+        "birthRetain": "false",
+        "birthPayload": "",
+        "birthMsg": {},
+        "closeTopic": "",
+        "closeQos": "0",
+        "closeRetain": "false",
+        "closePayload": "",
+        "closeMsg": {},
+        "willTopic": "",
+        "willQos": "0",
+        "willRetain": "false",
+        "willPayload": "",
+        "willMsg": {},
+        "userProps": "",
+        "sessionExpiry": ""
+    },
+    {
+        "id": "3b1d276f86dc41e1",
+        "type": "mqtt in",
+        "z": "f6f2187d.f17ca8",
+        "name": "",
+        "topic": "telemetry/#",
+        "qos": "1",
+        "datatype": "utf8",
+        "broker": "b5c08fca49d271fb",
+        "nl": false,
+        "rap": true,
+        "rh": 0,
+        "inputs": 0,
+        "x": 230,
+        "y": 240,
+        "wires": [
+            [
+                "756a67cd58cabb94"
+            ]
+        ]
+    },
+    {
+        "id": "07d550fc3a4e07c4",
+        "type": "mqtt out",
+        "z": "f6f2187d.f17ca8",
+        "name": "",
+        "topic": "",
+        "qos": "",
+        "retain": "",
+        "respTopic": "",
+        "contentType": "",
+        "userProps": "",
+        "correl": "",
+        "expiry": "",
+        "broker": "b5c08fca49d271fb",
+        "x": 510,
+        "y": 360,
+        "wires": []
+    },
+    {
+        "id": "756a67cd58cabb94",
+        "type": "json",
+        "z": "f6f2187d.f17ca8",
+        "name": "",
+        "property": "payload",
+        "action": "",
+        "pretty": false,
+        "x": 390,
+        "y": 240,
+        "wires": [
+            [
+                "0a16af086aa97153"
+            ]
+        ]
+    },
+    {
+        "id": "0a16af086aa97153",
+        "type": "function",
+        "z": "f6f2187d.f17ca8",
+        "name": "Initial Payload Validation",
+        "func": "// Drop messages missing required fields\n  const required = [\"device_id\", \"temperature\", \"timestamp\"];\n  for (const field of required) {\n      if (msg.payload[field] === undefined) {\n          node.warn(\"Invalid payload — missing: \" + field);\n          return null; // drop\n      }\n  }\n\n  const t = msg.payload.temperature;\n  if (typeof t !== \"number\" || t < -50 || t > 100) {\n      node.warn(\"Temperature out of range: \" + t);\n      return null;\n  }\n\n  // High-temp alarm → alerts/<device_id>\n  if (t > 30) {\n      node.send([msg, {\n          topic: \"alerts/\" + msg.payload.device_id,\n          payload: { device: msg.payload.device_id, temperature:\n  t }\n      }]);\n      return null;\n  }\n\n  return msg; // pass through",
+        "outputs": 2,
+        "timeout": 0,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 270,
+        "y": 300,
+        "wires": [
+            [
+                "462ecb394f917615"
+            ],
+            [
+                "07d550fc3a4e07c4"
+            ]
+        ]
+    },
+    {
+        "id": "462ecb394f917615",
+        "type": "function",
+        "z": "f6f2187d.f17ca8",
+        "name": "Policy Enforcement",
+        "func": "var policy = {\n      devices: {\n          sensor_01: {\n              allowed_topics: [\"telemetry/sensor_01\"],\n              rate_limit_msg_per_sec: 2,\n              enabled: true\n          }\n      },\n      default_policy: \"deny\"\n  };\n\n  var deviceId = msg.payload.device_id;\n  var topic    = msg.topic;\n\n  // 1. Unknown device → drop\n  if (!policy.devices[deviceId]) {\n      node.warn(\"Unknown device: \" + deviceId);\n      return null;\n  }\n\n  var dev = policy.devices[deviceId];\n\n  // 2. Disabled device → drop\n  if (!dev.enabled) {\n      return null;\n  }\n\n  // 3. Wrong topic → alert + drop\n  if (!dev.allowed_topics.includes(topic)) {\n      return [null, {\n          topic: \"alerts/policy\",\n          payload: { device: deviceId, violation: \"wrong_topic\",\n   topic: topic }\n      }];\n  }\n\n  // 4. Rate limit\n  var rates = context.get(\"rates\") || {};\n  var now   = Date.now();\n  if (!rates[deviceId] || now - rates[deviceId].ts > 1000) {\n      rates[deviceId] = { count: 0, ts: now };\n  }\n  rates[deviceId].count++;\n  context.set(\"rates\", rates);\n\n  if (rates[deviceId].count > dev.rate_limit_msg_per_sec) {\n      return [null, {\n          topic: \"alerts/ratelimit\",\n          payload: { device: deviceId, rate:\n  rates[deviceId].count }\n      }];\n  }\n\n  return msg;",
+        "outputs": 2,
+        "timeout": 0,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [
+            {
+                "var": "fs",
+                "module": "fs"
+            }
+        ],
+        "x": 270,
+        "y": 360,
+        "wires": [
+            [
+                "a564a4c3fe71bb85"
+            ],
+            [
+                "07d550fc3a4e07c4"
+            ]
+        ]
+    },
+    {
+        "id": "a564a4c3fe71bb85",
+        "type": "function",
+        "z": "f6f2187d.f17ca8",
+        "name": "Flood Detection",
+        "func": "// ─── Flood detection\n  var deviceId = msg.payload.device_id;\n  var counts   = context.get(\"counts\") || {};\n  var now      = Date.now();\n\n  if (!counts[deviceId] || now - counts[deviceId].window > 1000)\n  {\n      counts[deviceId] = { count: 0, window: now };\n  }\n  counts[deviceId].count++;\n  context.set(\"counts\", counts);\n\n  if (counts[deviceId].count > 10) {\n      node.warn(\"FLOOD ALERT: \" + deviceId);\n      node.send([null, {\n          topic: \"alerts/flood\",\n          payload: { device: deviceId, count:\n  counts[deviceId].count }\n      }]);\n      return null;\n  }\n\n  // ─── Metrics counter\n  var metrics = context.global.get(\"metrics\") || {\n      messages_total: 0,\n      alerts_total:   0,\n      blocked_total:  0\n  };\n  metrics.messages_total++;\n  context.global.set(\"metrics\", metrics);\n\n  return msg;",
+        "outputs": 2,
+        "timeout": 0,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 260,
+        "y": 420,
+        "wires": [
+            [
+                "07d550fc3a4e07c4"
+            ],
+            [
+                "07d550fc3a4e07c4"
+            ]
+        ]
+    },
+    {
+        "id": "6668b660d7cdc090",
+        "type": "http in",
+        "z": "f6f2187d.f17ca8",
+        "name": "Metrics in",
+        "url": "/metrics",
+        "method": "get",
+        "upload": false,
+        "skipBodyParsing": false,
+        "swaggerDoc": "",
+        "x": 240,
+        "y": 480,
+        "wires": [
+            [
+                "5f16dcdc5e0c08e7"
+            ]
+        ]
+    },
+    {
+        "id": "5f16dcdc5e0c08e7",
+        "type": "function",
+        "z": "f6f2187d.f17ca8",
+        "name": "Metrics parsing",
+        "func": "var metrics = context.global.get(\"metrics\") || {\n      messages_total: 0,\n      alerts_total:   0,\n      blocked_total:  0\n  };\n\n  msg.payload = [\n      \"# HELP mqtt_messages_total Total MQTT messages processed\",\n      \"# TYPE mqtt_messages_total counter\",\n      \"mqtt_messages_total \" + metrics.messages_total,\n      \"# HELP mqtt_alerts_total Total security alerts generated\",\n      \"# TYPE mqtt_alerts_total counter\",\n      \"mqtt_alerts_total \" + metrics.alerts_total,\n      \"# HELP mqtt_blocked_total Total dropped/blocked messages\",\n      \"# TYPE mqtt_blocked_total counter\",\n      \"mqtt_blocked_total \" + metrics.blocked_total\n  ].join(\"\\n\");\n\n  msg.headers = { \"content-type\": \"text/plain; version=0.0.4\" };\n  return msg;",
+        "outputs": 1,
+        "timeout": 0,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 460,
+        "y": 480,
+        "wires": [
+            [
+                "2f4e93866f9a4c39"
+            ]
+        ]
+    },
+    {
+        "id": "2f4e93866f9a4c39",
+        "type": "http response",
+        "z": "f6f2187d.f17ca8",
+        "name": "",
+        "statusCode": "200",
+        "headers": {},
+        "x": 680,
+        "y": 480,
+        "wires": []
+    }
+]

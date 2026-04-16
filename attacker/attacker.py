@@ -42,17 +42,17 @@ def mqtt_flood(
     Simulates a compromised device or a replay attack.
     """
     topic = f"telemetry/{device_id}"
-    client = mqtt.Client(client_id=f"flood-{device_id}")
+    client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2, client_id=f"flood-{device_id}")
 
     if username:
         client.username_pw_set(username, password)
 
     connected = Event()
-    def on_connect(c, ud, flags, rc):
-        if rc == 0:
-            connected.set()
+    def on_connect(c, ud, flags, reason_code, properties):
+        if reason_code.is_failure:
+            error(f"Flood connect failed RC={reason_code}")
         else:
-            error(f"Flood connect failed RC={rc}")
+            connected.set()
 
     client.on_connect = on_connect
 
@@ -78,7 +78,7 @@ def mqtt_flood(
             payload = json.dumps({
                 "device_id": device_id,
                 "temperature": round(random.uniform(20.0, 95.0), 2),
-                "ts": time.time(),
+                "timestamp": time.time(),
             })
             client.publish(topic, payload, qos=0)
             sent += 1
@@ -99,11 +99,11 @@ def _try_cred(host, port, username, password) -> bool:
     rc_box = [None]
     done = Event()
 
-    def on_connect(c, ud, flags, rc):
-        rc_box[0] = rc
+    def on_connect(c, ud, flags, reason_code, properties):
+        rc_box[0] = reason_code
         done.set()
 
-    c = mqtt.Client(client_id=f"bf-{random.randint(1000,9999)}")
+    c = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2, client_id=f"bf-{random.randint(1000,9999)}")
     c.username_pw_set(username, password)
     c.on_connect = on_connect
     try:
@@ -117,7 +117,7 @@ def _try_cred(host, port, username, password) -> bool:
         try: c.disconnect()
         except: pass
 
-    return rc_box[0] == 0
+    return rc_box[0] is not None and not rc_box[0].is_failure
 
 
 def brute_force_wordlist(host, port, wordlist_path):
